@@ -1,4 +1,5 @@
 const express = require("express");
+const { get } = require("http");
 const server = require("http").createServer();
 const app = express();
 
@@ -9,6 +10,13 @@ app.get("/", (req, res) => {
 server.on("request", app);
 server.listen(3000, () => {
   console.log("Server is listening on http://localhost:3000");
+});
+
+process.on("SIGINT", () => {
+  server.close(() => {
+    console.log("Server closed.");
+    shutdownDB();
+  });
 });
 
 // WebSocket setup
@@ -25,6 +33,10 @@ wss.on("connection", (ws) => {
     ws.send(`Welcome! Current visitors: ${numClients}`);
   }
 
+  db.run(
+    `INSERT INTO visitors (count, time) VALUES (${numClients}, datetime('now'))`
+  );
+
   ws.on("close", () => {
     const numClients = wss.clients.size;
     console.log(`Client disconnected. Total clients: ${numClients}`);
@@ -39,3 +51,34 @@ wss.broadcast = function (data) {
     }
   });
 };
+
+// end websocket setup
+
+// begin database setup
+const sqlite = require("sqlite3");
+const db = new sqlite.Database(":memory:");
+
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE visitors (
+      count INTEGER
+      time TEXT
+    )
+  `);
+});
+
+function getCounts() {
+  db.each("SELECT * FROM visitors", (err, row) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+    console.log(row);
+  });
+}
+
+function shutdownDB() {
+  getCounts();
+  console.log("Closed the database connection.");
+  db.close();
+}
