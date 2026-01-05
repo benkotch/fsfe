@@ -13,9 +13,12 @@ server.listen(3000, () => {
 });
 
 process.on("SIGINT", () => {
+  console.log("\nShutting down...");
+  wss.clients.forEach((client) => client.close());
   server.close(() => {
     console.log("Server closed.");
     shutdownDB();
+    process.exit(0);
   });
 });
 
@@ -61,7 +64,7 @@ const db = new sqlite.Database(":memory:");
 db.serialize(() => {
   db.run(`
     CREATE TABLE visitors (
-      count INTEGER
+      count INTEGER,
       time TEXT
     )
   `);
